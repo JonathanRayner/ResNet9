@@ -1,0 +1,57 @@
+* Background
+https://myrtle.ai/how-to-train-your-resnet-1-baseline/
+https://github.com/davidcpage/cifar10-fast
+
+[[net_diagram.svg]]
+
+* Import modules, data
+
+#+BEGIN_SRC emacs-lisp
+;; activate virtual environment so we can use jupyter
+(pyvenv-activate "~/.pyenv/versions/tensorflow_env")
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC jupyter-python :session j
+import tensorflow as tf
+import numpy as np
+import matplotlib.pyplot as plt
+
+print("TensorFlow executing eagerly: {}".format(tf.executing_eagerly()))
+#+END_SRC
+
+#+RESULTS:
+: TensorFlow executing eagerly: True
+
+Import cifar10
+#+BEGIN_SRC jupyter-python :session j
+cifar = tf.keras.datasets.cifar10
+(train_images, train_labels), (test_images, test_labels) = cifar.load_data()
+cifar_labels = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+
+# Take the last 10000 images from the training set to form a validation set
+train_labels = train_labels.squeeze()
+validation_images = train_images[-10000:, :, :]
+validation_labels = train_labels[-10000:]
+train_images = train_images[:-10000, :, :]
+train_labels = train_labels[:-10000]
+
+plt.figure(figsize=(10,10))
+for i in range(25):
+  plt.subplot(5,5,i+1)
+  plt.xticks([])
+  plt.yticks([])
+  plt.grid('off')
+
+  img_index = np.random.randint(0, 40000)
+  plt.imshow(train_images[img_index])
+  plt.xlabel(cifar_labels[train_labels[img_index]])
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+: Downloading data from https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz
+: 170500096/170498071 [==============================] - 86s 1us/step
+[[file:./.ob-jupyter/ac49d3bed29eff3d9f21facf88af724f809233a1.png]]
+:END:
