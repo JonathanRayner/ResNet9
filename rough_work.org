@@ -6,6 +6,8 @@ Current best on dawn: https://dawn.cs.stanford.edu/benchmark/#cifar10-train-time
 
 [[net_diagram.svg]]
 
+Some network specifics here: https://github.com/davidcpage/cifar10-fast/blob/master/demo.ipynb
+
 * Import modules, data
 
 #+BEGIN_SRC emacs-lisp
@@ -58,7 +60,7 @@ Build some blocks for the ResNet
 
 #+BEGIN_SRC jupyter-python :session j
 class Conv2D_BatchNorm_Relu(tf.keras.layers.Layer):
-    def __init__(self, filters, kernel_size):
+    def __init__(self, filters, kernel_size=3):
         super().__init__()
         self.filters = filters
         self.kernel_size = kernel_size
@@ -79,9 +81,50 @@ class Conv2D_BatchNorm_Relu(tf.keras.layers.Layer):
         """
         Batch Norm disabled during inference.
         """
-        x = self.conv2d(x)
+        x = self.conv2d(input_tensor)
         x = self.batch_norm(x, training=training)
         x = self.relu(x)
+        return x
+
+class ResNet9Block(tf.keras.layers.layer):
+    """
+    Creates a Residual Block of type used in the network in https://github.com/davidcpage/cifar10-fast (see demo.ipynbwhich details the structure). Structure:
+
+    Let CBR = Convolutional layer 2D -> Batch Norm -> ReLU
+    Let x = CBR -> Pooling Layer (factor of 2)
+
+    Then the structure is (x -> CBR -> CBR) + x
+
+    Arguments:
+        filters (int): number of filters used in all convolutions, and gives num channels of output tensor
+        kernel_size (int or tuple of 2 integers): window size used in all convolutions
+
+    Output shape:
+        (batch_size, rows/2, cols/2, filters)
+
+    Returns:
+        A tensor of rank 4
+    """
+    def __init_(self, filters, kernel_size=3):
+        super().__init__()
+        self.filters = filters
+        self.kernel_size = kernel_size
+
+    def build(self, input_shape):
+        self.conv_bn_relu_1 = Conv2D_BatchNorm_Relu(filters=self.filters, kernel_size=self.kernel_size)
+        self.conv_bn_relu_2 = Conv2D_BatchNorm_Relu(filters=self.filters, kernel_size=self.kernel_size)
+        self.conv_bn_relu_3 = Conv2D_BatchNorm_Relu(filters=self.filters, kernel_size=self.kernel_size)
+        self.max_pool2d = tf.keras.layers.MaxPool2D()
+
+    def call(self, input_tensor):
+        """
+        Residual behaviour implemented here.
+        """
+        x = self.conv_bn_relu_1(input_tensor)
+        x = self.max_pool2d(x)
+        y = self.conv_bn_relu_2(x)
+        y = self.conv_bn_relu_3(y)
+        x = x + y
         return x
 #+END_SRC
 
