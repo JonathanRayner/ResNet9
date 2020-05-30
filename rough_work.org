@@ -54,39 +54,52 @@ for i in range(25):
 #+END_SRC
 
 #+RESULTS:
-[[file:./.ob-jupyter/2136f916f6bdc6feac5e7537d64505761339850f.png]]
+[[file:./.ob-jupyter/624a8b3db365ea1e49c968e98a3ed498f4e4bc0f.png]]
 
 Build some blocks for the ResNet
 
 #+BEGIN_SRC jupyter-python :session j
-class Conv2D_BatchNorm_Relu(tf.keras.layers.Layer):
-    def __init__(self, filters, kernel_size=3):
-        super().__init__()
+class Conv2DBatchNormReLU(tf.keras.layers.Layer):
+    """
+    Creates a layer of the form:
+
+    Convolutional layer 2D -> Batch Norm -> ReLU
+
+    Conv layer uses He Uniform weight initialization.
+
+Arguments:
+    filters (int): number of filters used convolutions, and gives num channels of output tensor
+    kernel_size (int or tuple of 2 integers): window size used in convolutions
+
+Output shape:
+    (batch_size, rows, cols, filters)
+
+Returns:
+    A tensor of rank 4
+    """
+
+    def __init__(self, filters, kernel_size=3, **kwargs):
+        super().__init__(**kwargs)
         self.filters = filters
         self.kernel_size = kernel_size
 
     def build(self, input_shape):
-        """
-        Conv layer uses He Uniform weight initialization.
-        """
-        self.conv2d = Conv2D(filters=self.filters,
-                            kernel_size=self.kernel_size,
-                            padding='SAME',
-                            kernel_initializer=tf.keras.initializers.he_uniform(),
-                            input_shape=input_shape)
-        self.batch_norm = BatchNormalization()
+        self.conv2d = tf.keras.layers.Conv2D(filters=self.filters,
+                                             kernel_size=self.kernel_size,
+                                             padding='SAME',
+                                             kernel_initializer=tf.keras.initializers.he_uniform(),
+                                             input_shape=input_shape)
+        self.batch_norm = tf.keras.layers.BatchNormalization()
         self.relu = tf.keras.layers.ReLU()
 
     def call(self, input_tensor, training=False):
-        """
-        Batch Norm disabled during inference.
-        """
         x = self.conv2d(input_tensor)
+        # Batch Norm disabled during inference
         x = self.batch_norm(x, training=training)
         x = self.relu(x)
         return x
 
-class ResNet9Block(tf.keras.layers.layer):
+class ResNet9Block(tf.keras.layers.Layer):
     """
     Creates a Residual Block of type used in the network in https://github.com/davidcpage/cifar10-fast (see demo.ipynbwhich details the structure). Structure:
 
@@ -105,15 +118,16 @@ class ResNet9Block(tf.keras.layers.layer):
     Returns:
         A tensor of rank 4
     """
-    def __init_(self, filters, kernel_size=3):
-        super().__init__()
+
+    def __init_(self, filters, kernel_size=3, **kwargs):
+        super().__init__(**kwargs)
         self.filters = filters
         self.kernel_size = kernel_size
 
     def build(self, input_shape):
-        self.conv_bn_relu_1 = Conv2D_BatchNorm_Relu(filters=self.filters, kernel_size=self.kernel_size)
-        self.conv_bn_relu_2 = Conv2D_BatchNorm_Relu(filters=self.filters, kernel_size=self.kernel_size)
-        self.conv_bn_relu_3 = Conv2D_BatchNorm_Relu(filters=self.filters, kernel_size=self.kernel_size)
+        self.conv_bn_relu_1 = Conv2DBatchNormReLU(filters=self.filters, kernel_size=self.kernel_size)
+        self.conv_bn_relu_2 = Conv2DBatchNormReLU(filters=self.filters, kernel_size=self.kernel_size)
+        self.conv_bn_relu_3 = Conv2DBatchNormReLU(filters=self.filters, kernel_size=self.kernel_size)
         self.max_pool2d = tf.keras.layers.MaxPool2D()
 
     def call(self, input_tensor):
@@ -129,28 +143,66 @@ class ResNet9Block(tf.keras.layers.layer):
 #+END_SRC
 
 #+RESULTS:
-:RESULTS:
-# [goto error]
-:   File "<ipython-input-3-86f049b28dc7>", line 26
-:     return Add()([inputs, h])
-:     ^
-: IndentationError: unexpected indent
-:END:
 
+Build the model (structure, sizes of filters, convolutional kernels, pooling sizes can be found at https://github.com/davidcpage/cifar10-fast/blob/master/demo.ipynb)
 
 #+BEGIN_SRC jupyter-python :session j
-class ResidualBlock(tf.keras.layers.Layer):
-  def __init__(self, num_outputs):
-    super(MyDenseLayer, self).__init__()
-    self.num_outputs = num_outputs
+# All convolutions use (3,3) window size by default
+model = tf.keras.models.Sequential([
+    Conv2DBatchNormReLU(filters=64, input_shape=(32,32,3)),
+    ResNet9Block(filters=128),
+    Conv2DBatchNormReLU(filters=256),
+    tf.keras.layers.MaxPool2D(2),
+    ResNet9Block(filters=512),
+    tf.keras.layers.MaxPool2D(4),
+    tf.keras.layers.Flatten(),
+    tf.keras.layers.Dense(10, use_bias=False)
+])
 
-  def build(self, input_shape):
-    self.kernel = self.add_weight("kernel",
-                                  shape=[int(input_shape[-1]),
-                                         self.num_outputs])
+model.summary()
 
-  def call(self, input):
-    return tf.matmul(input, self.kernel)
-
-layer = MyDenseLayer(10)
+# visualize
+tf.keras.utils.plot_model(
+    model, to_file='model.png', show_shapes=True, show_layer_names=True,
+    rankdir='LR', expand_nested=True
+)
 #+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# [goto error]
+#+begin_example
+
+TypeErrorTraceback (most recent call last)
+<ipython-input-13-873140765ed5> in <module>
+      2 model = tf.keras.models.Sequential([
+      3     Conv2DBatchNormReLU(filters=64, input_shape=(32,32,3)),
+----> 4     ResNet9Block(filters=128),
+      5     Conv2DBatchNormReLU(filters=256),
+      6     tf.keras.layers.MaxPool2D(2),
+
+~/.pyenv/versions/tensorflow_env/lib/python3.8/site-packages/tensorflow/python/training/tracking/base.py in _method_wrapper(self, *args, **kwargs)
+    454     self._self_setattr_tracking = False  # pylint: disable=protected-access
+    455     try:
+--> 456       result = method(self, *args, **kwargs)
+    457     finally:
+    458       self._self_setattr_tracking = previous_value  # pylint: disable=protected-access
+
+~/.pyenv/versions/tensorflow_env/lib/python3.8/site-packages/tensorflow/python/keras/engine/base_layer.py in __init__(self, trainable, name, dtype, dynamic, **kwargs)
+    292     }
+    293     # Validate optional keyword arguments.
+--> 294     generic_utils.validate_kwargs(kwargs, allowed_kwargs)
+    295 
+    296     # Mutable properties
+
+~/.pyenv/versions/tensorflow_env/lib/python3.8/site-packages/tensorflow/python/keras/utils/generic_utils.py in validate_kwargs(kwargs, allowed_kwargs, error_message)
+    790   for kwarg in kwargs:
+    791     if kwarg not in allowed_kwargs:
+--> 792       raise TypeError(error_message, kwarg)
+    793 
+    794 
+
+TypeError: ('Keyword argument not understood:', 'filters')
+#+end_example
+:END:
+
