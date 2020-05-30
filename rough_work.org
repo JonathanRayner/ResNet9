@@ -54,7 +54,7 @@ for i in range(25):
 #+END_SRC
 
 #+RESULTS:
-[[file:./.ob-jupyter/624a8b3db365ea1e49c968e98a3ed498f4e4bc0f.png]]
+[[file:./.ob-jupyter/52cd1d064b49d06513c106f7080d6424e6ab7602.png]]
 
 Build some blocks for the ResNet
 
@@ -70,6 +70,7 @@ class Conv2DBatchNormReLU(tf.keras.layers.Layer):
 Arguments:
     filters (int): number of filters used convolutions, and gives num channels of output tensor
     kernel_size (int or tuple of 2 integers): window size used in convolutions
+    input_shape (tuple of 3 integers): only needed if this is the first layer in the network. Use (rows, cols, filters)
 
 Output shape:
     (batch_size, rows, cols, filters)
@@ -80,20 +81,15 @@ Returns:
 
     def __init__(self, filters, kernel_size=3, **kwargs):
         super().__init__(**kwargs)
-        self.filters = filters
-        self.kernel_size = kernel_size
-
-    def build(self, input_shape):
-        self.conv2d = tf.keras.layers.Conv2D(filters=self.filters,
-                                             kernel_size=self.kernel_size,
+        self.conv2d = tf.keras.layers.Conv2D(filters=filters,
+                                             kernel_size=kernel_size,
                                              padding='SAME',
-                                             kernel_initializer=tf.keras.initializers.he_uniform(),
-                                             input_shape=input_shape)
+                                             kernel_initializer=tf.keras.initializers.he_uniform())
         self.batch_norm = tf.keras.layers.BatchNormalization()
         self.relu = tf.keras.layers.ReLU()
 
-    def call(self, input_tensor, training=False):
-        x = self.conv2d(input_tensor)
+    def call(self, inputs, training=False):
+        x = self.conv2d(inputs)
         # Batch Norm disabled during inference
         x = self.batch_norm(x, training=training)
         x = self.relu(x)
@@ -111,6 +107,7 @@ class ResNet9Block(tf.keras.layers.Layer):
     Arguments:
         filters (int): number of filters used in all convolutions, and gives num channels of output tensor
         kernel_size (int or tuple of 2 integers): window size used in all convolutions
+    input_shape (tuple of 3 integers): only needed if this is the first layer in the network. Use (rows, cols, filters)
 
     Output shape:
         (batch_size, rows/2, cols/2, filters)
@@ -119,22 +116,18 @@ class ResNet9Block(tf.keras.layers.Layer):
         A tensor of rank 4
     """
 
-    def __init_(self, filters, kernel_size=3, **kwargs):
+    def __init__(self, filters, kernel_size=3, **kwargs):
         super().__init__(**kwargs)
-        self.filters = filters
-        self.kernel_size = kernel_size
-
-    def build(self, input_shape):
-        self.conv_bn_relu_1 = Conv2DBatchNormReLU(filters=self.filters, kernel_size=self.kernel_size)
-        self.conv_bn_relu_2 = Conv2DBatchNormReLU(filters=self.filters, kernel_size=self.kernel_size)
-        self.conv_bn_relu_3 = Conv2DBatchNormReLU(filters=self.filters, kernel_size=self.kernel_size)
+        self.conv_bn_relu_1 = Conv2DBatchNormReLU(filters=filters, kernel_size=kernel_size)
+        self.conv_bn_relu_2 = Conv2DBatchNormReLU(filters=filters, kernel_size=kernel_size)
+        self.conv_bn_relu_3 = Conv2DBatchNormReLU(filters=filters, kernel_size=kernel_size)
         self.max_pool2d = tf.keras.layers.MaxPool2D()
 
-    def call(self, input_tensor):
+    def call(self, inputs):
         """
         Residual behaviour implemented here.
         """
-        x = self.conv_bn_relu_1(input_tensor)
+        x = self.conv_bn_relu_1(inputs)
         x = self.max_pool2d(x)
         y = self.conv_bn_relu_2(x)
         y = self.conv_bn_relu_3(y)
@@ -147,7 +140,7 @@ class ResNet9Block(tf.keras.layers.Layer):
 Build the model (structure, sizes of filters, convolutional kernels, pooling sizes can be found at https://github.com/davidcpage/cifar10-fast/blob/master/demo.ipynb)
 
 #+BEGIN_SRC jupyter-python :session j
-# All convolutions use (3,3) window size by default
+
 model = tf.keras.models.Sequential([
     Conv2DBatchNormReLU(filters=64, input_shape=(32,32,3)),
     ResNet9Block(filters=128),
@@ -159,50 +152,117 @@ model = tf.keras.models.Sequential([
     tf.keras.layers.Dense(10, use_bias=False)
 ])
 
+
+# class ResNet9(tf.keras.Model):
+#     """
+#     ResNet9 architecture from https://github.com/davidcpage/cifar10-fast. Has 9 layers: Conv layer, Residual block containing 3 conv layers, Conv Layer, Residual block containing 3 conv layers, fully-connected layer for classification. Batch Norm is used after each convolutional layer, before ReLU. Max pooling is used once inside each residual block and explicitly. All convolutions use (3,3) window size, stride=1, no padding by default.
+#     """
+
+#     def __init__(self,
+#                 num_classes=10,
+#                 layer_filters=[64, 128, 256, 512],
+#                 kernel_size=3,
+#                 ,**kwargs):
+#         super().__init__(**kwargs)
+#         self.conv_1 = Conv2DBatchNormReLU(filters=layer_filters[0], kernel_size=kernel_size)
+#         self.residual_block_1 = ResNet9Block(filters=layer_filters[1], kernel_size=kernel_size)
+#         self.conv_2 = Conv2DBatchNormReLU(filters=layer_filters[2], kernel_size=kernel_size)
+#         self.pooling_1 = tf.keras.layers.MaxPool2D(2)
+#         self.residual_block_2 = ResNet9Block(filters=layer_filters[3], kernel_size=kernel_size)
+#         self.pooling_2 = tf.keras.layers.MaxPool2D(4)
+#         self.flatten = tf.keras.layers.Flatten()
+#         self.fully_connected = tf.keras.layers.Dense(num_classes, use_bias=False)
+
+#     def call(self, inputs):
+#         x = self.conv_1(inputs)
+#         x = self.residual_block_1(x)
+#         x = self.conv_2(x)
+#         x = self.pooling_1(x)
+#         x = self.residual_block_2(x)
+#         x = self.pooling_2(x)
+#         x = self.flatten(x)
+#         x = self.fully_connected(x)
+#         return x
+
+# model = ResNet9()
+# model.build(input_shape=(None,32,32,3))
+
 model.summary()
 
-# visualize
-tf.keras.utils.plot_model(
-    model, to_file='model.png', show_shapes=True, show_layer_names=True,
-    rankdir='LR', expand_nested=True
-)
+# TODO visualize (tried using functional API, but some more needed to get at residual blocks)
+# tf.keras.utils.plot_model(
+#     model, to_file='model.png', show_shapes=True, show_layer_names=True,
+#     rankdir='TB', expand_nested=True
+# )
 #+END_SRC
 
 #+RESULTS:
 :RESULTS:
-# [goto error]
 #+begin_example
-
-TypeErrorTraceback (most recent call last)
-<ipython-input-13-873140765ed5> in <module>
-      2 model = tf.keras.models.Sequential([
-      3     Conv2DBatchNormReLU(filters=64, input_shape=(32,32,3)),
-----> 4     ResNet9Block(filters=128),
-      5     Conv2DBatchNormReLU(filters=256),
-      6     tf.keras.layers.MaxPool2D(2),
-
-~/.pyenv/versions/tensorflow_env/lib/python3.8/site-packages/tensorflow/python/training/tracking/base.py in _method_wrapper(self, *args, **kwargs)
-    454     self._self_setattr_tracking = False  # pylint: disable=protected-access
-    455     try:
---> 456       result = method(self, *args, **kwargs)
-    457     finally:
-    458       self._self_setattr_tracking = previous_value  # pylint: disable=protected-access
-
-~/.pyenv/versions/tensorflow_env/lib/python3.8/site-packages/tensorflow/python/keras/engine/base_layer.py in __init__(self, trainable, name, dtype, dynamic, **kwargs)
-    292     }
-    293     # Validate optional keyword arguments.
---> 294     generic_utils.validate_kwargs(kwargs, allowed_kwargs)
-    295 
-    296     # Mutable properties
-
-~/.pyenv/versions/tensorflow_env/lib/python3.8/site-packages/tensorflow/python/keras/utils/generic_utils.py in validate_kwargs(kwargs, allowed_kwargs, error_message)
-    790   for kwarg in kwargs:
-    791     if kwarg not in allowed_kwargs:
---> 792       raise TypeError(error_message, kwarg)
-    793 
-    794 
-
-TypeError: ('Keyword argument not understood:', 'filters')
+Model: "sequential_9"
+_________________________________________________________________
+Layer (type)                 Output Shape              Param #   
+=================================================================
+conv2d_batch_norm_re_lu_121  (None, 32, 32, 64)        2048      
+_________________________________________________________________
+res_net9block_29 (ResNet9Blo (None, 16, 16, 128)       370560    
+_________________________________________________________________
+conv2d_batch_norm_re_lu_125  (None, 16, 16, 256)       296192    
+_________________________________________________________________
+max_pooling2d_58 (MaxPooling (None, 8, 8, 256)         0         
+_________________________________________________________________
+res_net9block_30 (ResNet9Blo (None, 4, 4, 512)         5905920   
+_________________________________________________________________
+max_pooling2d_60 (MaxPooling (None, 1, 1, 512)         0         
+_________________________________________________________________
+flatten_14 (Flatten)         (None, 512)               0         
+_________________________________________________________________
+dense_14 (Dense)             (None, 10)                5120      
+=================================================================
+Total params: 6,579,840
+Trainable params: 6,575,360
+Non-trainable params: 4,480
+_________________________________________________________________
 #+end_example
+[[file:./.ob-jupyter/045b448a6b4d6271cab268b52c7dbe58fc04f259.png]]
 :END:
 
+Train
+
+#+BEGIN_SRC jupyter-python :session j
+batch_size = 128
+num_epochs = 10  # The number of epochs (full passes through the data) to train for
+
+# triangle shape learning rate
+amplitude = 0.4
+offset = 10e-5 # we don't want exactly 0.0 learning rate at beginning and end
+# upside down, shifted, scaled absolute value
+learning_rates = [-abs(i*2*amplitude/num_epochs - amplitude) + amplitude + offset for i in range(num_epochs)]
+lr_schedule = tf.keras.callbacks.LearningRateScheduler(lambda epoch: learning_rates[epoch], verbose=1)
+
+# Compiling the model adds a loss function, optimiser and metrics to track during training
+model.compile(optimizer=tf.keras.optimizers.Adam(),
+              loss=tf.keras.losses.sparse_categorical_crossentropy(from_logits=True),
+              metrics=['accuracy'])
+
+# The fit function allows you to fit the compiled model to some training data
+model_fit = model.fit(train_images,
+                          train_labels,
+                          batch_size=batch_size,
+                          epochs=num_epochs,
+                          callbacks=[lr_schedule],
+                          validation_data=(validation_images, validation_labels)
+)
+
+print('Training complete')
+
+def plot_loss(model_fit):
+    plt.figure(figsize=(10,10))
+    plt.plot(model_fit.epoch, model_fit.history['accuracy'], color='b', label='Train')
+    plt.plot(model_fit.epoch, model_fit.history['val_accuracy'], color='g', label='Validation')
+    plt.xlabel('Epoch')
+    plt.legend()
+    plt.show()
+
+plot_loss(model_fit)
+#+END_SRC
