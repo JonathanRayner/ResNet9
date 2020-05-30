@@ -2,6 +2,8 @@
 https://myrtle.ai/how-to-train-your-resnet-1-baseline/
 https://github.com/davidcpage/cifar10-fast
 
+Current best on dawn: https://dawn.cs.stanford.edu/benchmark/#cifar10-train-time
+
 [[net_diagram.svg]]
 
 * Import modules, data
@@ -25,6 +27,7 @@ print("TensorFlow executing eagerly: {}".format(tf.executing_eagerly()))
 : TensorFlow executing eagerly: True
 
 Import cifar10
+
 #+BEGIN_SRC jupyter-python :session j
 cifar = tf.keras.datasets.cifar10
 (train_images, train_labels), (test_images, test_labels) = cifar.load_data()
@@ -39,19 +42,72 @@ train_labels = train_labels[:-10000]
 
 plt.figure(figsize=(10,10))
 for i in range(25):
-  plt.subplot(5,5,i+1)
-  plt.xticks([])
-  plt.yticks([])
-  plt.grid('off')
+    plt.subplot(5,5,i+1)
+    plt.xticks([])
+    plt.yticks([])
+    plt.grid('off')
+    img_index = np.random.randint(0, 40000)
+    plt.imshow(train_images[img_index])
+    plt.xlabel(cifar_labels[train_labels[img_index]])
+#+END_SRC
 
-  img_index = np.random.randint(0, 40000)
-  plt.imshow(train_images[img_index])
-  plt.xlabel(cifar_labels[train_labels[img_index]])
+#+RESULTS:
+[[file:./.ob-jupyter/2136f916f6bdc6feac5e7537d64505761339850f.png]]
+
+Build some blocks for the ResNet
+
+#+BEGIN_SRC jupyter-python :session j
+class Conv2D_BatchNorm_Relu(tf.keras.layers.Layer):
+    def __init__(self, filters, kernel_size):
+        super().__init__()
+        self.filters = filters
+        self.kernel_size = kernel_size
+
+    def build(self, input_shape):
+        """
+        Conv layer uses He Uniform weight initialization.
+        """
+        self.conv2d = Conv2D(filters=self.filters,
+                            kernel_size=self.kernel_size,
+                            padding='SAME',
+                            kernel_initializer=tf.keras.initializers.he_uniform(),
+                            input_shape=input_shape)
+        self.batch_norm = BatchNormalization()
+        self.relu = tf.keras.layers.ReLU()
+
+    def call(self, input_tensor, training=False):
+        """
+        Batch Norm disabled during inference.
+        """
+        x = self.conv2d(x)
+        x = self.batch_norm(x, training=training)
+        x = self.relu(x)
+        return x
 #+END_SRC
 
 #+RESULTS:
 :RESULTS:
-: Downloading data from https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz
-: 170500096/170498071 [==============================] - 86s 1us/step
-[[file:./.ob-jupyter/ac49d3bed29eff3d9f21facf88af724f809233a1.png]]
+# [goto error]
+:   File "<ipython-input-3-86f049b28dc7>", line 26
+:     return Add()([inputs, h])
+:     ^
+: IndentationError: unexpected indent
 :END:
+
+
+#+BEGIN_SRC jupyter-python :session j
+class ResidualBlock(tf.keras.layers.Layer):
+  def __init__(self, num_outputs):
+    super(MyDenseLayer, self).__init__()
+    self.num_outputs = num_outputs
+
+  def build(self, input_shape):
+    self.kernel = self.add_weight("kernel",
+                                  shape=[int(input_shape[-1]),
+                                         self.num_outputs])
+
+  def call(self, input):
+    return tf.matmul(input, self.kernel)
+
+layer = MyDenseLayer(10)
+#+END_SRC
