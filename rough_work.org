@@ -140,7 +140,6 @@ class ResNet9Block(tf.keras.layers.Layer):
 Build the model (structure, sizes of filters, convolutional kernels, pooling sizes can be found at https://github.com/davidcpage/cifar10-fast/blob/master/demo.ipynb)
 
 #+BEGIN_SRC jupyter-python :session j
-
 model = tf.keras.models.Sequential([
     Conv2DBatchNormReLU(filters=64, input_shape=(32,32,3)),
     ResNet9Block(filters=128),
@@ -151,7 +150,6 @@ model = tf.keras.models.Sequential([
     tf.keras.layers.Flatten(),
     tf.keras.layers.Dense(10, use_bias=False)
 ])
-
 
 # class ResNet9(tf.keras.Model):
 #     """
@@ -242,7 +240,7 @@ lr_schedule = tf.keras.callbacks.LearningRateScheduler(lambda epoch: learning_ra
 
 # Compiling the model adds a loss function, optimiser and metrics to track during training
 model.compile(optimizer=tf.keras.optimizers.Adam(),
-              loss=tf.keras.losses.sparse_categorical_crossentropy(from_logits=True),
+              loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
               metrics=['accuracy'])
 
 # The fit function allows you to fit the compiled model to some training data
@@ -266,3 +264,9 @@ def plot_loss(model_fit):
 
 plot_loss(model_fit)
 #+END_SRC
+
+#+RESULTS:
+: 
+: Epoch 00001: LearningRateScheduler reducing learning rate to 0.0001.
+: Epoch 1/10
+:  18/313 [>.............................] - ETA: 11:53 - loss: 2.9852 - accuracy: 0.2539
