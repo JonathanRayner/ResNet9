@@ -1,15 +1,15 @@
 # title shouldn't appear in toc
 * ResNet9 in Tensorflow :noexport:
 
-Implements the 9 layer ResNet of https://github.com/davidcpage/cifar10-fast in Tensorflow (their implementation uses PyTorch). 
+Implements the 9 layer ResNet of https://github.com/davidcpage/cifar10-fast in Tensorflow (their implementation uses PyTorch), for use in the CIFAR-10 classification task.
 
-This architecture is interesting, because it demonstrates that one can classify CIFAR-10 images at reasonably high levels of accuracy, while using extremely short training times and a single GPU. With careful choice of architecture, hyperparameters, data augmentation, and minimal other tricks, they achieve 94% accuracy 79s training time on a single Tesla V100. Using more advanced techniques, they get this time down to 26s. See [[https://myrtle.ai/how-to-train-your-resnet/][this series of blog posts]], which describes the process. See also the [[https://dawn.cs.stanford.edu/benchmark/index.html#cifar10-train-time][Stanford DAWNBench]] competition.
+This architecture is interesting, because it demonstrates that one can classify CIFAR-10 images at reasonably high levels of accuracy, while using extremely short training times and a single GPU. With careful choice of architecture, hyperparameters, data augmentation, and minimal other tricks, they achieve 94% accuracy with 79s training time on a single Tesla V100. Using more advanced techniques, they get this time down to 26s. See [[https://myrtle.ai/how-to-train-your-resnet/][this series of blog posts]], which describes the process. See also the [[https://dawn.cs.stanford.edu/benchmark/index.html#cifar10-train-time][Stanford DAWNBench]] competition.
 
 Initially, this project just aims to reimplement the model in Tensorflow. Timing and optimization may follow. 
 
 * Contents :TOC:
 
-* Architecture and Hyperparameters
+* Architecture
 
 The architecture is displayed in the following diagram from their Github
 
@@ -44,12 +44,14 @@ Some things to note:
 By default in PyTorch (0.4), initial batch norm scales are chosen uniformly at random from the interval [0,1]. Channels which are initialised near zero could be wasted so we replace this with a constant initialisation at 1. This leads to a larger signal through the network and to compensate we introduce an overall constant multiplicative rescaling of the final classifier. A rough manual optimisation of this extra hyperparameter suggest that 0.125 is a reasonable value. (The low value makes predictions less certain and appears to ease optimisation.)
 #+END_QUOTE
 
-  In Tensorflow, the default Batch Norm behavior is to initialize 
+In Tensorflow, the default Batch Norm behavior is to initialize the scale (gamma) with ones, so we make no modification to the defaults, but do include the final scalar multiplication layer.
 
-
+ 
+* Hyperparameters
+* Data Augmentation
 * Results
 
 * Discussion
 
-* TODO
+* TODO lol
 
