@@ -54,7 +54,7 @@ for i in range(25):
 #+END_SRC
 
 #+RESULTS:
-[[file:./.ob-jupyter/52cd1d064b49d06513c106f7080d6424e6ab7602.png]]
+[[file:./.ob-jupyter/2468ec91441cd48ee1235369a71308e3f79067a0.png]]
 
 Build some blocks for the ResNet
 
@@ -84,7 +84,8 @@ Returns:
         self.conv2d = tf.keras.layers.Conv2D(filters=filters,
                                              kernel_size=kernel_size,
                                              padding='SAME',
-                                             kernel_initializer=tf.keras.initializers.he_uniform())
+                                             kernel_initializer=tf.keras.initializers.he_uniform(),
+                                             kernel_regularizer=tf.keras.regularizers.l2(0.001))
         self.batch_norm = tf.keras.layers.BatchNormalization()
         self.relu = tf.keras.layers.ReLU()
 
@@ -195,47 +196,45 @@ model.summary()
 #+END_SRC
 
 #+RESULTS:
-:RESULTS:
 #+begin_example
-Model: "sequential_9"
+Model: "sequential"
 _________________________________________________________________
 Layer (type)                 Output Shape              Param #   
 =================================================================
-conv2d_batch_norm_re_lu_121  (None, 32, 32, 64)        2048      
+conv2d_batch_norm_re_lu (Con (None, 32, 32, 64)        2048      
 _________________________________________________________________
-res_net9block_29 (ResNet9Blo (None, 16, 16, 128)       370560    
+res_net9block (ResNet9Block) (None, 16, 16, 128)       370560    
 _________________________________________________________________
-conv2d_batch_norm_re_lu_125  (None, 16, 16, 256)       296192    
+conv2d_batch_norm_re_lu_4 (C (None, 16, 16, 256)       296192    
 _________________________________________________________________
-max_pooling2d_58 (MaxPooling (None, 8, 8, 256)         0         
+max_pooling2d_1 (MaxPooling2 (None, 8, 8, 256)         0         
 _________________________________________________________________
-res_net9block_30 (ResNet9Blo (None, 4, 4, 512)         5905920   
+res_net9block_1 (ResNet9Bloc (None, 4, 4, 512)         5905920   
 _________________________________________________________________
-max_pooling2d_60 (MaxPooling (None, 1, 1, 512)         0         
+max_pooling2d_3 (MaxPooling2 (None, 1, 1, 512)         0         
 _________________________________________________________________
-flatten_14 (Flatten)         (None, 512)               0         
+flatten (Flatten)            (None, 512)               0         
 _________________________________________________________________
-dense_14 (Dense)             (None, 10)                5120      
+dense (Dense)                (None, 10)                5120      
 =================================================================
 Total params: 6,579,840
 Trainable params: 6,575,360
 Non-trainable params: 4,480
 _________________________________________________________________
 #+end_example
-[[file:./.ob-jupyter/045b448a6b4d6271cab268b52c7dbe58fc04f259.png]]
-:END:
 
 Train
 
 #+BEGIN_SRC jupyter-python :session j
-batch_size = 128
+batch_size = 512
 num_epochs = 10  # The number of epochs (full passes through the data) to train for
 
 # triangle shape learning rate
 amplitude = 0.4
 offset = 10e-5 # we don't want exactly 0.0 learning rate at beginning and end
 # upside down, shifted, scaled absolute value
-learning_rates = [-abs(i*2*amplitude/num_epochs - amplitude) + amplitude + offset for i in range(num_epochs)]
+# learning_rates = [-abs(i*2*amplitude/num_epochs - amplitude) + amplitude + offset for i in range(num_epochs)]
+learning_rates = [0.1]*3 + [0.01]*3 + [0.001]*4
 lr_schedule = tf.keras.callbacks.LearningRateScheduler(lambda epoch: learning_rates[epoch], verbose=1)
 
 # Compiling the model adds a loss function, optimiser and metrics to track during training
@@ -256,8 +255,8 @@ print('Training complete')
 
 def plot_loss(model_fit):
     plt.figure(figsize=(10,10))
-    plt.plot(model_fit.epoch, model_fit.history['accuracy'], color='b', label='Train')
-    plt.plot(model_fit.epoch, model_fit.history['val_accuracy'], color='g', label='Validation')
+    plt.plot(model_fit.epoch, model_fit.history['loss'], color='b', label='Train')
+    plt.plot(model_fit.epoch, model_fit.history['val_loss'], color='g', label='Validation')
     plt.xlabel('Epoch')
     plt.legend()
     plt.show()
@@ -267,6 +266,5 @@ plot_loss(model_fit)
 
 #+RESULTS:
 : 
-: Epoch 00001: LearningRateScheduler reducing learning rate to 0.0001.
+: Epoch 00001: LearningRateScheduler reducing learning rate to 0.1.
 : Epoch 1/10
-:  18/313 [>.............................] - ETA: 11:53 - loss: 2.9852 - accuracy: 0.2539

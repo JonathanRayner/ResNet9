@@ -1,0 +1,55 @@
+# title shouldn't appear in toc
+* ResNet9 in Tensorflow :noexport:
+
+Implements the 9 layer ResNet of https://github.com/davidcpage/cifar10-fast in Tensorflow (their implementation uses PyTorch). 
+
+This architecture is interesting, because it demonstrates that one can classify CIFAR-10 images at reasonably high levels of accuracy, while using extremely short training times and a single GPU. With careful choice of architecture, hyperparameters, data augmentation, and minimal other tricks, they achieve 94% accuracy 79s training time on a single Tesla V100. Using more advanced techniques, they get this time down to 26s. See [[https://myrtle.ai/how-to-train-your-resnet/][this series of blog posts]], which describes the process. See also the [[https://dawn.cs.stanford.edu/benchmark/index.html#cifar10-train-time][Stanford DAWNBench]] competition.
+
+Initially, this project just aims to reimplement the model in Tensorflow. Timing and optimization may follow. 
+
+* Contents :TOC:
+
+* Architecture and Hyperparameters
+
+The architecture is displayed in the following diagram from their Github
+
+[[net_diagram.svg]] 
+
+To be explicit:
+
+1. Convolution Layer (64 filters), Batch Norm, ReLU
+2. Convolution Layer (128 filters), Batch Norm, ReLU
+3. Max Pooling Layer (factor of 2)
+4. Convolution Layer (128 filters), Batch Norm, ReLU
+5. Convolution Layer (128 filters), Batch Norm, ReLU
+6. Residual Connection (3+5)
+7. Convolution Layer (256 filters), Batch Norm, ReLU
+8. Max Pooling Layer (factor of 2)
+9. Convolution Layer (512 filters), Batch Norm, ReLU
+10. Pooling Layer (factor of 2)
+11. Convolution Layer (512 filters), Batch Norm, ReLU
+12. Convolution Layer (512 filters), Batch Norm, ReLU
+13. Residual Connection (10+12)
+14. Max Pooling Layer (factor of 4)
+15. Flatten
+16. Dense Layer (10 classes)
+17. Multiplication Layer (multiply all logits by 0.125)
+    
+Some things to note:
+
+- Batch Norm is performed before every ReLU
+- The final multiplication layer is explained by the following [[https://myrtle.ai/how-to-train-your-resnet-4-architecture/][quote]]:
+
+#+BEGIN_QUOTE
+By default in PyTorch (0.4), initial batch norm scales are chosen uniformly at random from the interval [0,1]. Channels which are initialised near zero could be wasted so we replace this with a constant initialisation at 1. This leads to a larger signal through the network and to compensate we introduce an overall constant multiplicative rescaling of the final classifier. A rough manual optimisation of this extra hyperparameter suggest that 0.125 is a reasonable value. (The low value makes predictions less certain and appears to ease optimisation.)
+#+END_QUOTE
+
+  In Tensorflow, the default Batch Norm behavior is to initialize 
+
+
+* Results
+
+* Discussion
+
+* TODO
+
