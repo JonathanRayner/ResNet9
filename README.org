@@ -9,9 +9,11 @@ Initially, this project just aims to reimplement the model in Tensorflow. Timing
 
 * Contents :TOC:
 
-* Architecture
+* Architecture, Hyperparameters
 
-The architecture is displayed in the following diagram from their Github
+** Our model
+
+We use their architecture and hyperparameters, unless noted otherwise. The architecture is displayed in the following diagram from their Github
 
 [[net_diagram.svg]] 
 
@@ -32,26 +34,44 @@ To be explicit:
 13. Residual Connection (10+12)
 14. Max Pooling Layer (factor of 4)
 15. Flatten
-16. Dense Layer (10 classes)
+16. Fully Connected Layer (10 classes)
 17. Multiplication Layer (multiply all logits by 0.125)
     
 Some things to note:
 
 - Batch Norm is performed before every ReLU
+- All convolutions are 3x3 filters with stride 1, padding 1. This is implemented by using ~padding='SAME'~ in Tensorflow. All convolution layers and the final fully connected layer have bias disabled.
+- We use 
+
+ 
+** Discussion of their model
+
+- Their choice of optimizer is SGD with ~momentum=0.9~, using [[https://stats.stackexchange.com/questions/179915/whats-the-difference-between-momentum-based-gradient-descent-and-nesterovs-acc][nesterov update]]. I'm actually [[https://github.com/davidcpage/cifar10-fast/issues/11][somewhat confused]] about the way they wrote their nesterov update. They include ~weight_decay=5e-5*batch_size~.
+- Their model uses the default PyTorch ~epsilon=1e-5~ and ~momentum=0.1~ for Batch Norm layers, as do we. This differs from the Tensorflow defaults ~epsilon=1e-3~ and ~momentum=0.99~. Note that ~momentum=0.1~ in PyTorch is ~momentum=0.9~ in Tensorflow.
+- Their model uses the default PyTorch initialization for the convolution and fully connected layers' weights, [[https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/conv.py#L62][which is]] Kaiming uniform. In Tensorflow this is ~he_uniform~.
 - The final multiplication layer is explained by the following [[https://myrtle.ai/how-to-train-your-resnet-4-architecture/][quote]]:
 
 #+BEGIN_QUOTE
 By default in PyTorch (0.4), initial batch norm scales are chosen uniformly at random from the interval [0,1]. Channels which are initialised near zero could be wasted so we replace this with a constant initialisation at 1. This leads to a larger signal through the network and to compensate we introduce an overall constant multiplicative rescaling of the final classifier. A rough manual optimisation of this extra hyperparameter suggest that 0.125 is a reasonable value. (The low value makes predictions less certain and appears to ease optimisation.)
 #+END_QUOTE
 
-In Tensorflow, the default Batch Norm behavior is to initialize the scale (gamma) with ones, so we make no modification to the defaults, but do include the final scalar multiplication layer.
+In Tensorflow, the default Batch Norm behavior is to initialize the weights with ones and the bias with zeros, so we make no modification to the defaults, but do include the final scalar multiplication layer.
 
- 
-* Hyperparameters
-* Data Augmentation
+* Preprocessing, Data Augmentation
+
+
+
 * Results
 
 * Discussion
 
-* TODO lol
+- I'm still somewhat confused about why I couldn't reproduce their exact results using the same hyperparameters in Tensorflow - there must be something that I missed. Possible culprits: 
+  - using built-in random cutout vs. their implementation, or perhaps something different
+  - test
+
+- These speed test contests do encourage "unnatural" levels of fine tuning, leading to brittle models. Making very slight modifications to my parameters (slightly more or less momentum on batch norm, a few pixels more or less padding, a few more or less pixels cutout, etc.) usually degraded the test accuracy noticeably. The question is whether this is just on the margin, or if we are learning nothing from dedicating time to these techniques. One thing that gives us confidence in this model: simply training a few more epochs (say 5, 10, or 20) and shifting the peak learning rate back (say to epoch 8 or 15) easily gives us a few more percent on test accuracy. So by really pushing the boundaries, we can discover some useful tricks and general themes, then just train a little longer and get less brittle results.
+
+* TODO TODO 
+
+Confirm that momentum=0.9 in their model's SGD is momentum=0.9 in our model.
 
