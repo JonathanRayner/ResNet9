@@ -7,13 +7,13 @@
 
 - Initially, this project just aims to reimplement the 79s version of their model in Tensorflow. Timing and optimization may follow. 
 
-*Current status*: this implementation achieves 94% accuracy in 112 seconds on a single Tesla V100, with 8 vCPUs. Not bad for a first pass without any careful optimization!
+*Current status*: this implementation achieves 94% accuracy in 90 seconds on a single Tesla V100, with 8 vCPUs. Not bad for a first pass and only using suggested generic optimization provided by Tensorflow!
 
 * Contents :TOC:
 - [[#architecture-hyperparameters][Architecture, Hyperparameters]]
 - [[#discussion][Discussion]]
 
-* Architecture, Hyperparameters
+* Architecture, Hyperparameters, implementation details
 
 We use their architecture and hyperparameters, unless noted otherwise. The architecture is displayed in the following diagram from their Github repo:
 
@@ -41,7 +41,8 @@ To be explicit:
     
 Details/things to note:
 
-- We use a general experimental Tensorflow mixed precision policy. This seems to improve training times without degrading accuracy too badly.
+- We use a general experimental Tensorflow mixed precision policy. This seems to improve training times without degrading accuracy noticeably. 
+- We also grab some low effort speedups: [[https://www.tensorflow.org/api_docs/python/tf/config/optimizer/set_jit][enabling JIT]], [[https://www.tensorflow.org/xla][explicit XLA where we can]] with ~@tf.function(experimental_compile=True)~, setting ~use_multiprocessing=True~, ~workers=8~, ~max_queue_size=512~ in ~model.fit~.
 - Batch size 512, 24 epochs.
 - Optimizer is SGD with ~momentum=0.9~, using [[https://stats.stackexchange.com/questions/179915/whats-the-difference-between-momentum-based-gradient-descent-and-nesterovs-acc][nesterov update.]] The learning rate begins at 0.08 and increases linearly to 0.4 at epoch 5 (warmup), then decreases linearly to 0.007 in epoch 24. Their implementation outputs a learning rate of 0 in epoch 24.
 - All convolutions are 3x3 filters with stride 1, padding 1. This is implemented by using ~padding='SAME'~ in Tensorflow. All convolution layers and the final fully connected layer have bias disabled.
