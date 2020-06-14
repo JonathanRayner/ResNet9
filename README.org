@@ -10,10 +10,10 @@
 *Current status*: this implementation achieves 94% accuracy in 90 seconds on a single Tesla V100, with 8 vCPUs. Not bad for a first pass and only using suggested generic optimization provided by Tensorflow!
 
 * Contents :TOC:
-- [[#architecture-hyperparameters][Architecture, Hyperparameters]]
+- [[#architecture-hyperparameters-implementation-details][Architecture, Hyperparameters, Implementation Details]]
 - [[#discussion][Discussion]]
 
-* Architecture, Hyperparameters, implementation details
+* Architecture, Hyperparameters, Implementation Details
 
 We use their architecture and hyperparameters, unless noted otherwise. The architecture is displayed in the following diagram from their Github repo:
 
