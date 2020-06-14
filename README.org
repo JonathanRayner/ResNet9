@@ -1,19 +1,23 @@
 # title shouldn't appear in toc
 * ResNet9 in Tensorflow :noexport:
 
-Implements the 9 layer ResNet of https://github.com/davidcpage/cifar10-fast in Tensorflow (their implementation uses PyTorch), for use in the CIFAR-10 classification task.
+Implements the 9 layer ResNet of https://github.com/davidcpage/cifar10-fast in Tensorflow, for use in the CIFAR-10 classification task (their implementation uses PyTorch),
 
 This architecture is interesting, because it demonstrates that one can classify CIFAR-10 images at reasonably high levels of accuracy, while using extremely short training times and a single GPU. With careful choice of architecture, hyperparameters, data augmentation, and minimal other tricks, they achieve 94% accuracy with 79s training time on a single Tesla V100. Using more advanced techniques, they get this time down to 26s. See [[https://myrtle.ai/how-to-train-your-resnet/][this series of blog posts]], which describes the process. See also the [[https://dawn.cs.stanford.edu/benchmark/index.html#cifar10-train-time][Stanford DAWNBench]] competition.
 
-Initially, this project just aims to reimplement the model in Tensorflow. Timing and optimization may follow. 
+Initially, this project just aims to reimplement the 79s version of their model in Tensorflow. Timing and optimization may follow. 
+
+Current status: this implementation achieves 94% accuracy in 112 seconds on a single Tesla V100, with 8 vCPUs. Not bad for a first pass without any optimization! 
+
+Possibly obvious, but a word of caution: when trying to reproduce these results, make sure to use all of the training data. If you have any sizeable hold-out validation set, performance degrades noticeably, because this model was optimized for the bleeding edge and because of the size of the dataset.
 
 * Contents :TOC:
+- [[#architecture-hyperparameters][Architecture, Hyperparameters]]
+- [[#discussion][Discussion]]
 
 * Architecture, Hyperparameters
 
-** Our model
-
-We use their architecture and hyperparameters, unless noted otherwise. The architecture is displayed in the following diagram from their Github
+We use their architecture and hyperparameters, unless noted otherwise. The architecture is displayed in the following diagram from their Github repo:
 
 [[net_diagram.svg]] 
 
@@ -37,41 +41,35 @@ To be explicit:
 16. Fully Connected Layer (10 classes)
 17. Multiplication Layer (multiply all logits by 0.125)
     
-Some things to note:
+Details/things to note:
+
+- We use a general experimental Tensorflow mixed precision policy. This seems to improving training times without degrading accuracy too badly.
+- Batch size 512, 24 epochs.
+- Optimizer is SGD with ~momentum=0.9~, using [[https://stats.stackexchange.com/questions/179915/whats-the-difference-between-momentum-based-gradient-descent-and-nesterovs-acc][nesterov update.]] The learning rate begins at 0.08 and increases linearly to 0.4 at epoch 5 (warmup), then decreases linearly to 0.007 in epoch 24. Their implementation outputs a learning rate of 0 in epoch 24, which I am skeptical of.
+- All convolutions are 3x3 filters with stride 1, padding 1. This is implemented by using ~padding='SAME'~ in Tensorflow. All convolution layers and the final fully connected layer have bias disabled.
+- Weights use ~he_uniform~ initialization [[https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/conv.py#L62][(Kaiming uniform in PyTorch]]), except for batch norm layers, which initialize weights to 1 and biases to 0. 
+- Batch norm layers use ~epsilon=1e-5~ and ~momentum=0.9~ (which correspond to PyTorch defaults - Tensorflow defaults are ~epsilon=1e-3~ and ~momentum=0.99~). Note that ~momentum=0.1~ in PyTorch is ~momentum=0.9~ in Tensorflow.
+- Data is normalized by Z-score.
+- All layers have l2 regularization ~2.5e-4~ (including batch norm weights and biases). This corresponds to ~weight_decay=5e-4~ that they use (Tensorflow does not include a factor of 1/2 in the l2 regularizer). Note: l2 regularization is not equivalent to weight decay when using SGD with momentum, but [[https://github.com/davidcpage/cifar10-fast/blob/master/torch_backend.py#L242][their update rule couples weight decay to momentum]], so they are equivalent in this case. Also note: they actually write ~weight_decay=5e-4*batch_size~, because they are dividing by the batch size elsewhere (they have turned off dividing by batch size when calculating gradients). The default SGD setting in Tensorflow just does everything correctly, so don't be confused by this.
+- Data is augmented by padding with 4 pixels, applying random cropping back to 32x32, random left-right flips, and random 8x8 cutout. Example:
+
+[[augmented.png]]
 
 - Batch Norm is performed before every ReLU
-- All convolutions are 3x3 filters with stride 1, padding 1. This is implemented by using ~padding='SAME'~ in Tensorflow. All convolution layers and the final fully connected layer have bias disabled.
-- We use 
-
- 
-** Discussion of their model
-
-- Their choice of optimizer is SGD with ~momentum=0.9~, using [[https://stats.stackexchange.com/questions/179915/whats-the-difference-between-momentum-based-gradient-descent-and-nesterovs-acc][nesterov update]]. I'm actually [[https://github.com/davidcpage/cifar10-fast/issues/11][somewhat confused]] about the way they wrote their nesterov update. They include ~weight_decay=5e-5*batch_size~.
-- Their model uses the default PyTorch ~epsilon=1e-5~ and ~momentum=0.1~ for Batch Norm layers, as do we. This differs from the Tensorflow defaults ~epsilon=1e-3~ and ~momentum=0.99~. Note that ~momentum=0.1~ in PyTorch is ~momentum=0.9~ in Tensorflow.
-- Their model uses the default PyTorch initialization for the convolution and fully connected layers' weights, [[https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/conv.py#L62][which is]] Kaiming uniform. In Tensorflow this is ~he_uniform~.
 - The final multiplication layer is explained by the following [[https://myrtle.ai/how-to-train-your-resnet-4-architecture/][quote]]:
 
 #+BEGIN_QUOTE
 By default in PyTorch (0.4), initial batch norm scales are chosen uniformly at random from the interval [0,1]. Channels which are initialised near zero could be wasted so we replace this with a constant initialisation at 1. This leads to a larger signal through the network and to compensate we introduce an overall constant multiplicative rescaling of the final classifier. A rough manual optimisation of this extra hyperparameter suggest that 0.125 is a reasonable value. (The low value makes predictions less certain and appears to ease optimisation.)
 #+END_QUOTE
 
-In Tensorflow, the default Batch Norm behavior is to initialize the weights with ones and the bias with zeros, so we make no modification to the defaults, but do include the final scalar multiplication layer.
-
-* Preprocessing, Data Augmentation
-
-
-
-* Results
-
 * Discussion
 
-- I'm still somewhat confused about why I couldn't reproduce their exact results using the same hyperparameters in Tensorflow - there must be something that I missed. Possible culprits: 
-  - using built-in random cutout vs. their implementation, or perhaps something different
-  - test
+Some possible improvements:
 
-- These speed test contests do encourage "unnatural" levels of fine tuning, leading to brittle models. Making very slight modifications to my parameters (slightly more or less momentum on batch norm, a few pixels more or less padding, a few more or less pixels cutout, etc.) usually degraded the test accuracy noticeably. The question is whether this is just on the margin, or if we are learning nothing from dedicating time to these techniques. One thing that gives us confidence in this model: simply training a few more epochs (say 5, 10, or 20) and shifting the peak learning rate back (say to epoch 8 or 15) easily gives us a few more percent on test accuracy. So by really pushing the boundaries, we can discover some useful tricks and general themes, then just train a little longer and get less brittle results.
-
-* TODO TODO 
-
-Confirm that momentum=0.9 in their model's SGD is momentum=0.9 in our model.
+- General search for bottlenecks in the Tensorflow functions (particularly in data augmentation).
+- Investigate how random number generation for on the fly data augmentation is affecting performance. [[https://myrtle.ai/learn/how-to-train-your-resnet-1-baseline/][They identified this as a possible bottleneck]]. 
+- Currently all data is repeatedly shuffled. Smaller shuffle buffers might yield equivalent accuracy, for reduced training times. 
+- Investigate if we can reduce training times by coupling weight decay to momentum directly with a custom optimizer instead of applying l2 regularization to every layer. The tensorflow_addons package has a version of SGD with weight decay decoupled from momentum (SGDW) - could also investigate if this improves accuracy or training times (might require searching for new hyperparameters).
+- Linearly decreasing learning rate from epoch 5 to 24 seems a little "too good to be true." Perhaps there's a staircase schedule that can shave off an epoch or two.
+- All of the [[https://myrtle.ai/learn/how-to-train-your-resnet-8-bag-of-tricks/][further tricks]] that they used for the DAWNBench competition.
 
